@@ -35,7 +35,7 @@ int main() {
 
     // if the file couldn't be openend, the pointer will be NULL
     FILE* fptr;
-    if ((fptr = fopen("reading.txt", "r")) == NULL) {
+    if ((fptr = fopen("rawdaing.txt", "r")) == NULL) {
         perror("File opening failed");
         return 1;
     }
