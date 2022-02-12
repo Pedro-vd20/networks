@@ -60,5 +60,7 @@ int main(int argc, char **argv)
         printf("%s\n", DIVIDER);
     }
 
+    fclose(pcapPtr);
+
     return 0;
 }
