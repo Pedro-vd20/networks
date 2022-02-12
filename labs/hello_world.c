@@ -20,11 +20,15 @@ int main() {
 
 	int a;
 
-	printf("Enter an integer: ");
+	// printf("Enter an integer: ");
 	// taking values
-	scanf("%d", &a);	// needs to be pointer (so we use address operator
+	// scanf("%d", &a);	// needs to be pointer (so we use address operator
 	// printing values
-	printf("Hello World\nYou entered: %d");
+	// printf("Hello World\nYou entered: %d\n", a);
+
+	char* nums = "abcd";
+	int num = 8;
+	printf("%p\n", (int**) nums);
 
 	return 0;
 }
