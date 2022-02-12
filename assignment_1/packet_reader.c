@@ -54,7 +54,12 @@ int main(int argc, char **argv)
         fread(data, dataSize, 1, pcapPtr);
 
         // print data
-        printf("%s\n", data);
+        // printf("%s\n", data);
+        // Must print like this since there can be '\0' inside the data
+        for(int i = 0; i < dataSize; ++i) {
+            printf("%c", data[i]);
+        }
+        printf("\n");
 
         free(data);
         printf("%s\n", DIVIDER);
