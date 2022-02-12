@@ -80,13 +80,6 @@ int main() {
     srvaddr.sin_family = AF_INET;
     srvaddr.sin_port = htons(5000); // convert from computer byte order to network byte order
     srvaddr.sin_addr.s_addr = INADDR_ANY;
-    // pass struct to bind function
-    int status = bind(serverfd, (const struct sockaddr*)&srvaddr, sizeof(srvaddr));
-    // check if bind fail
-    if(status < 0) {
-        perror("");
-        return -1;
-    }
 
     while(1) {
         char buffer[256];
