@@ -7,51 +7,58 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
 
-int main(int argc, char** argv) {
-    FILE* pcapPtr;
+int main(int argc, char **argv)
+{
+    FILE *pcapPtr;
     // Check if file was passed and can be opened
-    
-    
-    if(argc < 2 || ((pcapPtr = fopen(argv[1], "rb")) == NULL)) {
+
+    if (argc < 2 || ((pcapPtr = fopen(argv[1], "rb")) == NULL))
+    {
         printf("File opening failed\n");
         return 1;
     }
 
     // global constants for file format
-    const int G_HEADER = 24, R_HEADER = 16, E_HEADER = 14, IP_HEADER = 20;
-    const int UDP_HEADER = 4;
-    const int NUM_PACKETS = 2;
-    const char const * DIVIDER = "-------------------------";
+    const int G_HEADER = 24, R_HEADER = 16, E_HEADER = 14, IP_HEADER = 20,
+              NUM_PACKETS = 2, HEADER_ITEMS = 4;
+    const char const *DIVIDER = "-------------------------";
 
     // skip global header
     fseek(pcapPtr, G_HEADER, SEEK_SET);
 
     printf("%s\n", DIVIDER);
 
-    short srcPort, destPort, length, checkSum;
-
-    /*// loop through both packets
-    for(int i = 0; i < 1; ++i) {
-        unsigned short srcPort, destPort, length, checkSum;
-
-        // skip headers
+    for (int i = 0; i < NUM_PACKETS; ++i)
+    {
+        // skip header info
         fseek(pcapPtr, R_HEADER + E_HEADER + IP_HEADER, SEEK_CUR);
 
-        // read UDP header
-        fscanf(pcapPtr, "%hu%hu%hu%hu", &srcPort, &destPort, &length, &checkSum);
+        // collect header info
+        unsigned short header[HEADER_ITEMS];
+        fread(header, sizeof(short), HEADER_ITEMS, pcapPtr);
 
-        // convert to host byte order
-        srcPort = ntohs(srcPort);
-        destPort = ntohs(destPort);
-        length = ntohs(length);
-        checkSum = ntohs(checkSum);
+        // print header data
+        printf("Src Port: %hu\n", ntohs(header[0]));
+        printf("Des Port: %hu\n", ntohs(header[1]));
+        printf("UDP Packet Length: %hu\n", ntohs(header[2]));
+        printf("Checksum: 0x%x\n", ntohs(header[3]));
 
-        // print file info
-        printf("Src Port: %hu\nDes Port: %hu\nUDP Packet Length: %hu\nChecksum: %x\n", srcPort, destPort, length, checkSum);
-    }*/
+        // collect data
+        int dataSize = (int)ntohs(header[2]) - 8;
+        char* data = malloc(dataSize + 1);
+        data[dataSize] = '\0';
 
-    printf("YAY!\n");
+        fread(data, dataSize, 1, pcapPtr);
+
+        // print data
+        printf("%s\n", data);
+
+        free(data);
+        printf("%s\n", DIVIDER);
+    }
 
     return 0;
 }
