@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 
     // global constants for file format
     const int G_HEADER = 24, R_HEADER = 16, E_HEADER = 14, IP_HEADER = 20,
-              NUM_PACKETS = 2, HEADER_ITEMS = 4;
+              NUM_PACKETS = 5, HEADER_ITEMS = 4;
     const char const *DIVIDER = "-------------------------";
 
     // skip global header
