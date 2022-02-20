@@ -33,12 +33,10 @@ int main() {
     char* message = "Time request";
     sendto(clientSocket, message, strlen(message), 0, (const struct sockaddr*)&address, sizeof(address));
 
-    // listen for response
+    // listen for time response
     char time[64];
     recvfrom(clientSocket, time, sizeof(time), 0, 0, 0);
-
     printf("%s\n", time);
-
 
     close(clientSocket);
 
