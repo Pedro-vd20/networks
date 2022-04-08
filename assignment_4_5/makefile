@@ -2,7 +2,7 @@ webserver: webserver.o threading.o strings.o
 	gcc -pthread webserver.o threading.o strings.o -o webserver
 
 webserver.o: webserver.c user.h
-	gcc -c -pthread webserver.c
+	gcc -c -w -pthread webserver.c
 
 threading.o: threading.c threading.h
 	gcc -c -pthread threading.c

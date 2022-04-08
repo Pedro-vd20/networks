@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -6,6 +7,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "strings.h"
 #include "user.h"
@@ -16,11 +18,21 @@
  * 
  * @param void* pointer to a client struct holding the socket and address info of a client 
  */
-void* makeResponse(void*);
+void* make_response(void*);
+
+/**
+ * @brief builds an http response based on the provided status code
+ * 
+ * @param char* status code of message
+ * @param char* file type (null if error status)
+ * @param char* http body (null if error message)
+ * @return char* full http response (using malloc, caller must free memory)
+ */
+char* build_response(char*, char*, char*);
 
 // response building blocks
 const char* OK_RESPONSE = "HTTP/1.0 200 ok\r\n";
-const char* SERVER = "Server: SimpleHTTPServer";
+const char* SERVER = "Server: SimpleHTTPServer\r\n";
 const char* NOT_UNDERSTOOD = "HTTP/1.0 400 Bad Request\r\n";
 const char* FILE_NOT_FOUND = "HTTP/1.0 404 Not Found\r\n";
 const char* METHOD_NOT_ALLOWED = "HTTP/1.0 405 Method Not Allowed\r\n";
@@ -29,6 +41,8 @@ const char* DATE = "Date: ";
 const char* TYPE = "Content-type: ";
 const char* LEN = "Content-length: ";
 const char* ALLOW = "Allow: GET\r\n";
+const char* NOT_FOUND_BODY = "<html>\n\t<head>\n\t\t<title>404 Page Not Found</title>\n\t</head>\n\t<body>\n\t\t<h1>404 Page Not Found</h1>\n\t</body>\n</html>";
+const char* NOT_FOUND_LENGTH = "114";
 
 int main() {
 
@@ -81,7 +95,7 @@ int main() {
 		user.address = client_address;
 		int t_id_index = open_thread(busy, 10);
 		// check if index -1 (figure out how to handle later)
-		if(pthread_create(thread_ids + t_id_index, NULL, makeResponse, &user) < 0) {
+		if(pthread_create(thread_ids + t_id_index, NULL, make_response, &user) < 0) {
 			perror("multithreading");
 			return -1;
 		}
@@ -97,9 +111,7 @@ int main() {
 }
 
 
-void* makeResponse(void* arg) {
-	
-	char* response_code = "200";
+void* make_response(void* arg) {
 
 	// collect user information
 	int sd = ((client*)arg)->socket;
@@ -112,26 +124,54 @@ void* makeResponse(void* arg) {
 	int bytes = recv(sd, request, sizeof(request), 0);
 	char* request_header[3];
 	if(parse_header(request_header, request, 1000) < 0 ) {
-		// error couldn't understand response
+		char* response = build_response("400", NULL, NULL);
+		
+		// send response
+		send(sd, response, strlen(response), 0);
+		close(sd);
 
-		// ERROR
-		// ERROR
-		response_code = "400";
+		// free used memory
+		free(response);
+		for(int i = 0; i < 3; ++i) {
+			free(request_header[i]);
+		}
+
+		return;
 	}
 
 	// check request method
 	if(strcmp(request_header[0], "GET") != 0) {
-		response_code = "405";
-		// ERROR
-		// ERROR
+		char* response = build_response("405", NULL, NULL);
+		
+		// send response
+		send(sd, response, strlen(response), 0);
+		close(sd);
+
+		// free used memory
+		free(response);
+		for(int i = 0; i < 3; ++i) {
+			free(request_header[i]);
+		}
+
+		return;
 	}
 
 	// check file type
-	char* f_type = get_file_type(request_header[2]);
+	char* f_type = get_file_type(request_header[1]);
 	if(f_type == NULL) {
-		response_code = "400";
-		// Error 
-		// Error
+		char* response = build_response("404", NULL, NULL);
+		// send response
+		send(sd, response, strlen(response), 0);
+		close(sd);
+
+		// free used memory
+		free(f_type);
+		free(response);
+		for(int i = 0; i < 3; ++i) {
+			free(request_header[i]);
+		}
+
+		return;
 	}
 
 	// get full file path
@@ -141,36 +181,111 @@ void* makeResponse(void* arg) {
 	// open file
 	FILE* file = fopen(full_fpath, "r");
 	if(file == NULL) {
-		response_code = "404";
-		// Error 
-		// Error
+		char* response = build_response("404", NULL, NULL);
+		
+		// send response
+		send(sd, response, strlen(response), 0);
+		close(sd);
+
+		// free used memory
+		free(f_type);
+		free(response);
+		for(int i = 0; i < 3; ++i) {
+			free(request_header[i]);
+		}
+
+		return;
 	}
 
-	
-	// free header
+	// get file contents
+	char* file_content = malloc(50000);
+	char line[256];
+	while(fgets(line, sizeof(line), file) != 0) {
+		strcat(file_content, line);
+	}
+	fclose(file);
+
+	// build HTTP response
+	char* response = build_response("200", f_type, file_content);
+
+	// send response
+	send(sd, response, strlen(response), 0);
+	close(sd);
+
+	// free used memory
+	free(file_content);
+	free(f_type);
+	free(response);
 	for(int i = 0; i < 3; ++i) {
 		free(request_header[i]);
 	}
-	free(f_type);
+}
 
-
-
-	// dummy code to delete later
-	char response[1000]="HTTP/1.1 200 OK \r\n\n";		//http header
-
-	// FILE* file = fopen("files/index.html","r");				//open the index.html file
-	if(file == NULL) {
-		perror("File error:");
-		
-	}
-
-	char line[256];
-	while(fgets(line,sizeof(line),file)!=0) {				//concatinate the index.html file line by line into server response
-		strcat(response,line);
-	}
-	fclose(file);
+char* build_response(char* status, char* type, char* file) {
 	
-	//5. send
-	send(sd,response,sizeof(response),0);		//send the server response to the client
-	close(sd);									//close the client socket
+	char* response = malloc(50000);
+	bzero(response, sizeof(response));
+
+	// collect date
+	time_t now = time(NULL);
+	struct tm* time = localtime(&now);
+
+	char length[10];
+	if(file != NULL) {
+		sprintf(length, "%ld", strlen(file));
+	}
+
+	/* if error responses
+	 * 400
+	 * 404
+	 * 405
+	 */
+	// bad request
+	if(strcmp(status, "400") == 0) {
+		strcpy(response, NOT_UNDERSTOOD);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+		strcat(response, "\n");
+	}
+	// file not found
+	else if(strcmp(status, "404") == 0) {
+		strcpy(response, FILE_NOT_FOUND);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+		strcat(response, TYPE);
+		strcat(response, "text/html\r\n");
+		strcat(response, LEN);
+		strcat(response, NOT_FOUND_LENGTH);
+		strcat(response, "\r\n\n");
+		strcat(response, NOT_FOUND_BODY);
+		strcat(response, "\n");
+	}
+	// method not allowed
+	else if(strcmp(status, "405") == 0) {
+		strcpy(response, METHOD_NOT_ALLOWED);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+        strcat(response, ALLOW);
+		strcat(response, "\n");
+	}
+	// ok response
+	else {
+		strcpy(response, OK_RESPONSE);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+		strcat(response, TYPE);
+		strcat(response, type);
+        strcat(response, "\n");
+		strcat(response, LEN);
+		strcat(response, length);
+		strcat(response, "\r\n\n");
+		strcat(response, file);
+		strcat(response, "\n");
+	}
+
+	return response;
 }

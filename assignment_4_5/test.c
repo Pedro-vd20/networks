@@ -2,109 +2,98 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
-int parse_header(char* header[3], char* line, int length) {
+const char* OK_RESPONSE = "HTTP/1.0 200 ok\r\n";
+const char* SERVER = "Server: SimpleHTTPServer\r\n";
+const char* NOT_UNDERSTOOD = "HTTP/1.0 400 Bad Request\r\n";
+const char* FILE_NOT_FOUND = "HTTP/1.0 404 Not Found\r\n";
+const char* METHOD_NOT_ALLOWED = "HTTP/1.0 405 Method Not Allowed\r\n";
 
-    char* str = malloc(length + 1);
-    memcpy(str, line, length);
-    str[length] = '\0';
+const char* DATE = "Date: ";
+const char* TYPE = "Content-type: ";
+const char* LEN = "Content-length: ";
+const char* ALLOW = "Allow: GET\r\n";
+const char* NOT_FOUND_BODY = "<html>\n\t<head>\n\t\t<title>404 Page Not Found</title>\n\t</head>\n\t<body>\n\t\t<h1>404 Page Not Found</h1>\n\t</body>\n</html>";
+const char* NOT_FOUND_LENGTH = "114";
 
-    // collect first line
-    char* first_line = strtok(str, "\n");
-    if(first_line == NULL) {
-        free(str);
-        return -1; // wrong format
-    } 
+char* build_response(char* status, char* type, char* file) {
+	
+	char* response = malloc(50000);
 
-    
-    // Extract the first word
-    char * token = strtok(first_line, " ");
-    int len = strlen(token);
-    header[0] = malloc(len + 1);
-    header[0][len] = '\0';
-    strncpy(header[0], token, strlen(token));
-    
-    // loop through the string to extract all other words
-    for(int i = 1; i < 3; ++i) {
-        token = strtok(NULL, " ");
-        // if error reading word
-        if(token == NULL) { 
-            free(str);
-            return -1;
-        }
+	// collect date
+	time_t now = time(NULL);
+	struct tm* time = localtime(&now);
 
-        len = strlen(token);
-        header[i] = malloc(len + 1);
-        strncpy(header[i], token, len);
-        header[i][len] = '\0';
-    }
-    
-    
-    free(str);
-    return 0;
+	char length[10];
+	if(file != NULL) {
+		sprintf(length, "%ld", strlen(file));
+	}
 
-}
+	/* if error responses
+	 * 400
+	 * 404
+	 * 405
+	 */
+	// bad request
+	if(strcmp(status, "400") == 0) {
+		strcat(response, NOT_UNDERSTOOD);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+		strcat(response, "\n");
+	}
+	// file not found
+	else if(strcmp(status, "404") == 0) {
+		strcat(response, FILE_NOT_FOUND);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+		strcat(response, TYPE);
+		strcat(response, "text/html\r\n");
+		strcat(response, LEN);
+		strcat(response, NOT_FOUND_LENGTH);
+		strcat(response, "\r\n\n");
+		strcat(response, NOT_FOUND_BODY);
+		strcat(response, "\n");
+	}
+	// method not allowed
+	else if(strcmp(status, "405") == 0) {
+		strcat(response, METHOD_NOT_ALLOWED);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+        strcat(response, ALLOW);
+		strcat(response, "\n");
+	}
+	// ok response
+	else {
+		strcat(response, OK_RESPONSE);
+		strcat(response, SERVER);
+		strcat(response, DATE);
+		strcat(response, asctime(time));
+		strcat(response, TYPE);
+		strcat(response, type);
+        strcat(response, "\n");
+		strcat(response, LEN);
+		strcat(response, length);
+		strcat(response, "\r\n\n");
+		strcat(response, file);
+		strcat(response, "\n");
+	}
 
-char* get_file_type(char* file) {
-    /* Expected file types:
-     * text/html
-     * application/javascript
-     * text/css
-     * image/png
-     */
-
-    // creat temp stringstrlen(file) (strtok doesn't work on parameter)
-    int len = strlen(file);
-    char* f = malloc(len + 1);
-    strcpy(f, file);
-    f[len] = '\0';
-
-    // parse file by file_name + file_type
-    char* token = strtok(f, ".");
-    if(token) { // not NULL
-        token = strtok(NULL, ".");
-    }
-
-    if(!token) {
-        free(f);
-        return NULL;
-    }
-
-    char* file_type = malloc(50);
-    bzero(file_type, sizeof(file_type));
-    if(strcmp(token, "html") == 0) {
-        strcpy(file_type, "text/html");
-    }
-    else if(strcmp(token, "css") == 0) {
-        strcpy(file_type, "text/css");
-    }
-    else if(strcmp(token, "js") == 0) {
-        strcpy(file_type, "application/javascript");
-    }
-    else if(strcmp(token, "png") == 0) {
-        strcpy(file_type, "image/png");
-    }
-    else {
-        free(f);
-        free(file_type);
-        return NULL;
-    }
-
-    free(f);
-    return file_type; 
+	return response;
 }
 
 int main() {
 
-    char* file = malloc(10);
-    file = "index.\0";
+    char* status = "200";
+    char* type = "application/javascript";
+    char* file = NULL;
 
-    char* s = get_file_type(file);
-    if(s) 
-        printf("%s\n", s);
-    else
-        printf("Error\n");
+    char* response = build_response(status, type, (char*)NOT_FOUND_BODY);
 
+    printf("%s\n", response);
 
     return 0;
 }

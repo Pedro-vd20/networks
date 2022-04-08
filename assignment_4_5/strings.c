@@ -12,6 +12,7 @@ int parse_header(char* header[3], char* line, int length) {
         free(str);
         return -1; // wrong format
     } 
+    strcat(first_line, " ");
 
     
     // Extract the first word
