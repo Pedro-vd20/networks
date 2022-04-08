@@ -11,7 +11,24 @@
 #include "user.h"
 #include "threading.h"
 
+/**
+ * @brief process http request from a user and reply with http response
+ * 
+ * @param void* pointer to a client struct holding the socket and address info of a client 
+ */
 void* makeResponse(void*);
+
+// response building blocks
+const char* OK_RESPONSE = "HTTP/1.0 200 ok\r\n";
+const char* SERVER = "Server: SimpleHTTPServer";
+const char* NOT_UNDERSTOOD = "HTTP/1.0 400 Bad Request\r\n";
+const char* FILE_NOT_FOUND = "HTTP/1.0 404 Not Found\r\n";
+const char* METHOD_NOT_ALLOWED = "HTTP/1.0 405 Method Not Allowed\r\n";
+
+const char* DATE = "Date: ";
+const char* TYPE = "Content-type: ";
+const char* LEN = "Content-length: ";
+const char* ALLOW = "Allow: GET\r\n";
 
 int main() {
 
@@ -71,31 +88,6 @@ int main() {
 
 		// close threads that finish running
 		join_thread(thread_ids, busy, 10);
-
-		/*
-		char client_name[100];		//to store client address 
-		inet_ntop(AF_INET,&client_address.sin_addr,client_name,sizeof(client_name));
-		//The reason why we were getting wrong client addresses at the end of todays session because 
-		//instead of converting client_address.sin_addr to string were were converting client_address. 
-
-		printf("Connection established from %s \n",client_name);
-
-		char response[1000]="HTTP/1.1 200 OK \r\n\n";		//http header
-
-		FILE* file = fopen("files/index.html","r");				//open the index.html file
-		if(file == NULL) {
-			perror("File error:");
-			return -1;
-		}
-		char line[256];
-		while(fgets(line,sizeof(line),file)!=0) {				//concatinate the index.html file line by line into server response
-			strcat(response,line);
-		}
-		fclose(file);
-		
-		//5. send
-		send(client_sd,response,sizeof(response),0);		//send the server response to the client
-		close(client_sd);									//close the client socket */
 	}	
 
 	close(server_sd);										//close the server socket
@@ -106,7 +98,79 @@ int main() {
 
 
 void* makeResponse(void* arg) {
-	client user = *(client*)arg;
+	
+	char* response_code = "200";
 
-	printf("HERE\n");
+	// collect user information
+	int sd = ((client*)arg)->socket;
+	struct sockaddr_in user_address = ((client*)arg)->address;
+	char client_name[100];		//to store client address 
+	inet_ntop(AF_INET, &user_address.sin_addr, client_name, sizeof(client_name));
+	
+	// collect request from client
+	char request[1000];
+	int bytes = recv(sd, request, sizeof(request), 0);
+	char* request_header[3];
+	if(parse_header(request_header, request, 1000) < 0 ) {
+		// error couldn't understand response
+
+		// ERROR
+		// ERROR
+		response_code = "400";
+	}
+
+	// check request method
+	if(strcmp(request_header[0], "GET") != 0) {
+		response_code = "405";
+		// ERROR
+		// ERROR
+	}
+
+	// check file type
+	char* f_type = get_file_type(request_header[2]);
+	if(f_type == NULL) {
+		response_code = "400";
+		// Error 
+		// Error
+	}
+
+	// get full file path
+	char full_fpath[50] = "files";
+	strcat(full_fpath, request_header[1]);
+
+	// open file
+	FILE* file = fopen(full_fpath, "r");
+	if(file == NULL) {
+		response_code = "404";
+		// Error 
+		// Error
+	}
+
+	
+	// free header
+	for(int i = 0; i < 3; ++i) {
+		free(request_header[i]);
+	}
+	free(f_type);
+
+
+
+	// dummy code to delete later
+	char response[1000]="HTTP/1.1 200 OK \r\n\n";		//http header
+
+	// FILE* file = fopen("files/index.html","r");				//open the index.html file
+	if(file == NULL) {
+		perror("File error:");
+		
+	}
+
+	char line[256];
+	while(fgets(line,sizeof(line),file)!=0) {				//concatinate the index.html file line by line into server response
+		strcat(response,line);
+	}
+	fclose(file);
+	
+	//5. send
+	send(sd,response,sizeof(response),0);		//send the server response to the client
+	close(sd);									//close the client socket
 }
