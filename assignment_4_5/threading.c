@@ -1,35 +1,46 @@
-#include<stdio.h>
-#include<unistd.h>
-#include<pthread.h>
+#include <pthread.h>
 
-//void foo(int arg)
-void* foo(void *arg)
-{
-	int par = *(int *)(arg);
+#include "threading.h"
 
-	for(int i=0; i<10; i++)
-	{
-		printf("Call %d: %d \n",par,i);
-		usleep(10000);
+/**
+ * @brief find index of first available thread and flags that thread as "busy"
+ * 
+ * @param busy list containing 1s for busy threads
+ * @param size length of busy
+ * @return int index of next available thread, -1 if none available 
+ */
+int open_thread(int* busy, int size) {
+	for(int i = 0; i < size; ++i) {
+		if(!busy[i]) {
+			busy[i] = 1;	// flag as busy for later iterations
+			return i;
+		}
 	}
-	return NULL;
+
+	// if none found, return -1 (reject request)
+	return -1;
 }
 
-int main()
-{
-	
-	int par1 =1;
-	int par2 =2;
-	pthread_t t_id1, t_id2;
+/**
+ * @brief closes currently running threads and flags closed threads as available
+ * 
+ * @param threads list of possibly running threads
+ * @param busy list flagging currently running threads
+ * @param size num of threads
+ * @return int 0 if all succeeds, -1 if there was an error closing a thread
+ */
+int join_thread(pthread_t* threads, int* busy, int size) {
+	for(int i = 0; i < size; ++i) {
+		if(busy[i]) {
+			if(pthread_join(threads[i], NULL) == 0) {
+				busy[i] = 0;
+			}
+			else {
+				return -1; // error joining thread
+			}
+		}
+	}
 
-	pthread_create(&t_id1,NULL,foo,&par1);
-	pthread_create(&t_id2,NULL,foo,&par2);
-
-
-	pthread_join(t_id1,NULL);
-	pthread_join(t_id2,NULL);
-	//foo(1);
-	//foo(2);
-
-	return 0;
+	return 0;	// no errors happened
 }
+
