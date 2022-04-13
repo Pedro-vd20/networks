@@ -28,7 +28,17 @@ void* make_response(void*);
  * @param char* http body (null if error message)
  * @return char* full http response (using malloc, caller must free memory)
  */
-char* build_response(char*, char*, char*);
+char* build_response(char*, char*, char*, struct tm*);
+
+/**
+ * @brief print out info about request
+ * 
+ * @param char* ip
+ * @param struct tm* local time of request
+ * @param char* line of request
+ * @param char* status code
+ */
+void debug(char*, struct tm*, char*, char*);
 
 // response building blocks
 const char* OK_RESPONSE = "HTTP/1.0 200 ok\r\n";
@@ -107,6 +117,8 @@ int main() {
 	close(server_sd);										//close the server socket
 	//6. close
 
+	return 0;
+
 
 }
 
@@ -119,13 +131,21 @@ void* make_response(void* arg) {
 	char client_name[100];		//to store client address 
 	inet_ntop(AF_INET, &user_address.sin_addr, client_name, sizeof(client_name));
 	
+	// get time
+	time_t t = time(NULL);
+	struct tm* now = localtime(&t); 
+
 	// collect request from client
 	char request[1000];
 	int bytes = recv(sd, request, sizeof(request), 0);
+	char first_line[100];
+	get_first_line(request, first_line);
+
 	char* request_header[3];
-	if(parse_header(request_header, request, 1000) < 0 ) {
-		char* response = build_response("400", NULL, NULL);
-		
+	if(parse_header(request_header, first_line) < 0 ) {
+		char* response = build_response("400", NULL, NULL, now);
+		debug(client_name, now, first_line, "400");
+
 		// send response
 		send(sd, response, strlen(response), 0);
 		close(sd);
@@ -141,8 +161,9 @@ void* make_response(void* arg) {
 
 	// check request method
 	if(strcmp(request_header[0], "GET") != 0) {
-		char* response = build_response("405", NULL, NULL);
-		
+		char* response = build_response("405", NULL, NULL, now);
+		debug(client_name, now, first_line, "405");
+
 		// send response
 		send(sd, response, strlen(response), 0);
 		close(sd);
@@ -159,7 +180,9 @@ void* make_response(void* arg) {
 	// check file type
 	char* f_type = get_file_type(request_header[1]);
 	if(f_type == NULL) {
-		char* response = build_response("404", NULL, NULL);
+		char* response = build_response("404", NULL, NULL, now);
+		debug(client_name, now, first_line, "404");
+		
 		// send response
 		send(sd, response, strlen(response), 0);
 		close(sd);
@@ -181,8 +204,9 @@ void* make_response(void* arg) {
 	// open file
 	FILE* file = fopen(full_fpath, "r");
 	if(file == NULL) {
-		char* response = build_response("404", NULL, NULL);
-		
+		char* response = build_response("404", NULL, NULL, now);
+		debug(client_name, now, first_line, "404");
+
 		// send response
 		send(sd, response, strlen(response), 0);
 		close(sd);
@@ -199,6 +223,7 @@ void* make_response(void* arg) {
 
 	// get file contents
 	char* file_content = malloc(50000);
+	bzero(file_content, sizeof(file_content));
 	char line[256];
 	while(fgets(line, sizeof(line), file) != 0) {
 		strcat(file_content, line);
@@ -206,7 +231,8 @@ void* make_response(void* arg) {
 	fclose(file);
 
 	// build HTTP response
-	char* response = build_response("200", f_type, file_content);
+	char* response = build_response("200", f_type, file_content, now);
+	debug(client_name, now, first_line, "200");
 
 	// send response
 	send(sd, response, strlen(response), 0);
@@ -221,14 +247,10 @@ void* make_response(void* arg) {
 	}
 }
 
-char* build_response(char* status, char* type, char* file) {
+char* build_response(char* status, char* type, char* file, struct tm* now) {
 	
 	char* response = malloc(50000);
 	bzero(response, sizeof(response));
-
-	// collect date
-	time_t now = time(NULL);
-	struct tm* time = localtime(&now);
 
 	char length[10];
 	if(file != NULL) {
@@ -245,7 +267,7 @@ char* build_response(char* status, char* type, char* file) {
 		strcpy(response, NOT_UNDERSTOOD);
 		strcat(response, SERVER);
 		strcat(response, DATE);
-		strcat(response, asctime(time));
+		strcat(response, asctime(now));
 		strcat(response, "\n");
 	}
 	// file not found
@@ -253,7 +275,7 @@ char* build_response(char* status, char* type, char* file) {
 		strcpy(response, FILE_NOT_FOUND);
 		strcat(response, SERVER);
 		strcat(response, DATE);
-		strcat(response, asctime(time));
+		strcat(response, asctime(now));
 		strcat(response, TYPE);
 		strcat(response, "text/html\r\n");
 		strcat(response, LEN);
@@ -267,7 +289,7 @@ char* build_response(char* status, char* type, char* file) {
 		strcpy(response, METHOD_NOT_ALLOWED);
 		strcat(response, SERVER);
 		strcat(response, DATE);
-		strcat(response, asctime(time));
+		strcat(response, asctime(now));
         strcat(response, ALLOW);
 		strcat(response, "\n");
 	}
@@ -276,7 +298,7 @@ char* build_response(char* status, char* type, char* file) {
 		strcpy(response, OK_RESPONSE);
 		strcat(response, SERVER);
 		strcat(response, DATE);
-		strcat(response, asctime(time));
+		strcat(response, asctime(now));
 		strcat(response, TYPE);
 		strcat(response, type);
         strcat(response, "\n");
@@ -288,4 +310,11 @@ char* build_response(char* status, char* type, char* file) {
 	}
 
 	return response;
+}
+
+void debug(char* ip, struct tm* now, char* line, char* status) {
+	
+	char* months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+	
+	printf("%s [%d/%s/%d %d:%d:%d] \"", ip, now->tm_mday, months[now->tm_mon], now->tm_year, now->tm_hour, now->tm_min, now->tm_sec, line, status);
 }

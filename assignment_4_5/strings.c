@@ -1,44 +1,39 @@
+#include <stdio.h>
+
 #include "strings.h"
 
-int parse_header(char* header[3], char* line, int length) {
+int get_first_line(char* request, char* line) {
+	
+	// find index of newline
+	char* ptr = strstr(request, "\n");
 
-    char* str = malloc(length + 1);
-    memcpy(str, line, length);
-    str[length] = '\0';
+	bzero(line, sizeof(line));
+	strncpy(line, request, ptr - request);
 
-    // collect first line
-    char* first_line = strtok(str, "\n");
-    if(first_line == NULL) {
-        free(str);
-        return -1; // wrong format
-    } 
-    strcat(first_line, " ");
+    return 0;
+}
 
-    
-    // Extract the first word
-    char * token = strtok(first_line, " ");
-    int len = strlen(token);
-    header[0] = malloc(len + 1);
-    header[0][len] = '\0';
-    strncpy(header[0], token, strlen(token));
-    
-    // loop through the string to extract all other words
-    for(int i = 1; i < 3; ++i) {
-        token = strtok(NULL, " ");
-        // if error reading word
-        if(token == NULL) { 
-            free(str);
-            return -1;
-        }
+int parse_header(char* header[3], char* line) {
 
-        len = strlen(token);
-        header[i] = malloc(len + 1);
-        strncpy(header[i], token, len);
-        header[i][len] = '\0';
-    }
-    
-    
-    free(str);
+	// collect GET
+	header[0] = malloc(10);
+	bzero(header[0], 10);
+
+	char* ptr = strstr(line, " ");
+	strncpy(header[0], line, ptr - line);
+
+	// get file Name
+	header[1] = malloc(50);
+	bzero(header[1], 50);
+	
+	ptr = strstr(line + 4, " ");
+	strncpy(header[1], line + 4, ptr-line-4);
+
+	// get HTTP
+	header[2] = malloc(10);
+	bzero(header[2], 10);
+	strcpy(header[2], ptr + 1);
+	
     return 0;
 
 }
