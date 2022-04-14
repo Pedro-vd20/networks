@@ -316,5 +316,6 @@ void debug(char* ip, struct tm* now, char* line, char* status) {
 	
 	char* months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 	
-	printf("%s [%d/%s/%d %d:%d:%d] \"", ip, now->tm_mday, months[now->tm_mon], now->tm_year, now->tm_hour, now->tm_min, now->tm_sec, line, status);
+	fflush(stdout);
+	printf("%s [%d/%s/%d %d:%d:%d] \"%s\" %s\n", ip, now->tm_mday, months[now->tm_mon], now->tm_year, now->tm_hour, now->tm_min, now->tm_sec, strtok(line, "\r"), status);
 }
